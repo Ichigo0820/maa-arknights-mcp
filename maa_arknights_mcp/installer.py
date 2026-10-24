@@ -51,23 +51,47 @@ class MAAInstaller:
         self.cli = MAACLI(cmd=maa_cmd)
 
     def check_installed(self) -> bool:
-        """检查 MAA CLI 是否已安装"""
-        return self.cli.check_available()
+        """检查 MAA CLI 是否可用（不要求 MaaCore 已安装）"""
+        return self.cli.run(["--version"]).success
+
+    def check_core_installed(self) -> bool:
+        """检查 MaaCore 及资源是否已安装
+
+        `maa version` 会同时输出 maa-cli 与 MaaCore 版本，
+        未安装 MaaCore 时该命令返回非 0。
+        """
+        return self.cli.run(["version"]).success
 
     def get_status(self) -> InstallStatus:
         """获取当前安装状态"""
         maa_cli_installed = self.check_installed()
         maa_cli_version = None
+        maa_core_installed = False
         maa_core_version = None
 
         if maa_cli_installed:
-            maa_cli_version = self.cli.get_version()
+            cli_version = self.cli.run(["--version"])
+            maa_cli_version = cli_version.stdout.strip() or None
+
+            version_result = self.cli.run(["version"])
+            maa_core_installed = version_result.success
+            if maa_core_installed:
+                maa_core_version = version_result.stdout.strip() or None
+
+        if not maa_cli_installed:
+            message = "MAA CLI 未安装"
+        elif maa_core_installed:
+            message = "MAA CLI 及 MaaCore 已安装"
+        else:
+            message = "MAA CLI 已安装，但 MaaCore/资源未安装，请运行 maa_install"
 
         return InstallStatus(
-            success=maa_cli_installed,
-            message="MAA CLI 已安装" if maa_cli_installed else "MAA CLI 未安装",
+            success=maa_cli_installed and maa_core_installed,
+            message=message,
             maa_cli_installed=maa_cli_installed,
+            maa_core_installed=maa_core_installed,
             maa_cli_version=maa_cli_version,
+            maa_core_version=maa_core_version,
         )
 
     def install(
@@ -89,31 +113,37 @@ class MAAInstaller:
             self.cli = MAACLI(cmd=maa_cmd)
 
         # 检查是否已安装
-        if not force and self.check_installed():
+        cli_ready = self.check_installed()
+        core_ready = self.check_core_installed() if cli_ready else False
+
+        if cli_ready and core_ready and not force:
             status = self.get_status()
-            status.message = "MAA CLI 已安装，使用 --force 强制重新安装"
+            status.message = "MAA CLI 及 MaaCore 已安装，使用 --force 强制重新安装"
             return status
 
-        logger.info(f"开始安装 MAA CLI (平台：{self.platform})")
+        # CLI 已安装且只是缺少 MaaCore 时，跳过 CLI 安装步骤
+        if not cli_ready or force:
+            logger.info(f"开始安装 MAA CLI (平台：{self.platform})")
 
-        # 根据平台选择安装方式
-        if self.platform == "windows":
-            success = self._install_windows()
-        elif self.platform == "darwin":
-            success = self._install_macos()
-        elif self.platform == "linux":
-            success = self._install_linux()
-        else:
-            return InstallStatus(
-                success=False,
-                message=f"不支持的平台：{self.platform}",
-            )
+            # 根据平台选择安装方式
+            if self.platform == "windows":
+                success = self._install_windows()
+            elif self.platform == "darwin":
+                success = self._install_macos()
+            elif self.platform == "linux":
+                success = self._install_linux()
+            else:
+                return InstallStatus(
+                    success=False,
+                    message=f"不支持的平台：{self.platform}",
+                )
 
-        if not success:
-            return InstallStatus(
-                success=False,
-                message="MAA CLI 安装失败，请手动安装",
-            )
+            # 安装脚本失败时，若 CLI 实际已可用则继续安装 MaaCore
+            if not success and not self.check_installed():
+                return InstallStatus(
+                    success=False,
+                    message="MAA CLI 安装失败，请手动安装",
+                )
 
         # 安装 MaaCore
         logger.info("安装 MaaCore 及资源...")

@@ -1,5 +1,7 @@
 # MAA Arknights MCP Server
 
+> ⚠️ **本项目由 AI 开发，未经人工全面审查。使用风险自负，请勿在生产环境或重要场景中使用。**
+
 基于 [MAA (MaaAssistantArknights)](https://github.com/MaaAssistantArknights/MaaAssistantArknights) CLI 的 MCP Server，让 AI 助手能够自动化明日方舟游戏。
 
 ## 🎯 项目定位
@@ -127,22 +129,65 @@ uv pip install -e .
    }
    ```
 
+   **OpenCode**：项目根目录已提供 `opencode.jsonc`：
+   ```jsonc
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "mcp": {
+       "servers": {
+         "maa_arknights": {
+           "type": "local",
+           "command": [".venv\\Scripts\\python.exe", "-m", "maa_arknights_mcp"],
+           "cwd": "."
+         }
+       }
+     }
+   }
+   ```
+
+   > ⚠️ 服务器名必须是 `maa_arknights`（下划线），不能写成 `maa-arknights`。
+   > OpenCode 会用服务器名生成 Code Mode 路径 `tools.<server>.<tool>`，
+   > 连字符会让工具名变成 `tools.maa-arknights_maa_check` 这类无法调用的形式，
+   > 调用时就会报 “No tool named ...” 错误。
+   >
+   > 另外不要设置 `"codemode": false`，否则工具不会出现在 Code Mode 目录中。
+   >
+   > 修改配置后，在 OpenCode 中执行 `/mcps` 重新连接，或重启 OpenCode。
+
 ### 使用示例
 
 **自然语言交互：**
 
 ```
-用户：帮我刷 BB-7，用 3 个理智药
+用户：帮我刷 1-7，刷 5 次
 AI：好的，正在执行...
-    → 调用 maa_fight(stage="BB-7", count=3, use_drugs=True)
+    → 调用 maa_startup(client="Official", addr="127.0.0.1:58526")
+    → 调用 maa_fight(stage="1-7", count=5, addr="127.0.0.1:58526")
     → 返回任务结果
 
 用户：帮我打一次肉鸽
 AI：好的，正在启动集成战略...
-    → 调用 maa_startup(client="Official")
+    → 调用 maa_startup(client="Official", addr="127.0.0.1:58526")
     → 调用 maa_roguelike(theme="Phantom")
     → 返回任务结果
 ```
+
+### WSA 配置
+
+如果你使用 Windows Subsystem for Android（WSA），需要创建配置文件：
+
+```toml
+# config/profiles/default.toml
+[connection]
+adb_path = "adb"
+address = "127.0.0.1:58526"
+config = "General"
+
+[instance_options]
+touch_mode = "adb"
+```
+
+> **关键**：WSA 没有 `/dev/input` 触摸设备，必须设置 `touch_mode = "adb"`，否则 MAA 会报 `TouchModeNotAvailable` 错误。
 
 ## 📋 可用工具
 
@@ -162,6 +207,16 @@ AI：好的，正在启动集成战略...
 | `maa_copilot` | 抄作业 |
 | `maa_sscopilot` | 保全派驻 |
 | `maa_paradoxcopilot` | 悖论模拟 |
+
+### 基建/公招
+
+> maa-cli 0.7.x 没有 `infrast` / `recruit` 子命令，需通过 `maa_run` + 任务文件执行。
+
+| 工具 | 说明 |
+|------|------|
+| `maa_run` | 运行自定义任务（基建/公招等） |
+| `maa_infrast_*` | 基建管理（需通过 `maa_run` 执行） |
+| `maa_recruit_*` | 公招系统（需通过 `maa_run` 执行） |
 
 ### 肉鸽/演算
 
@@ -211,31 +266,38 @@ pytest tests/
 
 ## 📝 自定义任务
 
-MAA CLI 支持自定义任务配置文件，可以编排复杂流程：
+MAA CLI 支持自定义任务配置文件（TOML/JSON 格式），可以编排复杂流程。
 
-```yaml
-# examples/daily_task.yaml
-tasks:
-  - name: startup
-    command: startup
-    params:
-      client: Official
-  
-  - name: fight
-    command: fight
-    params:
-      stage: BB-7
-      count: 3
-      use_drugs: true
-  
-  - name: closedown
-    command: closedown
+任务文件放在 `config/tasks/` 目录下，文件名即为任务名。
+
+```toml
+# config/tasks/daily.toml
+[[tasks]]
+type = "StartUp"
+params = { client_type = "Official" }
+
+[[tasks]]
+type = "Fight"
+params = { stage = "1-7", times = 5 }
+
+[[tasks]]
+type = "Infrast"
+
+[[tasks]]
+type = "Recruit"
+
+[[tasks]]
+type = "Closedown"
 ```
 
 运行：
 ```bash
-maa run daily_task
+maa run daily
+# 或指定设备地址
+maa run daily -a 127.0.0.1:58526
 ```
+
+> **注意**：maa-cli 0.7.x 没有 `infrast` / `recruit` 子命令，基建和公招必须通过自定义任务文件执行。
 
 ## 🤝 与 MaaMCP 的区别
 

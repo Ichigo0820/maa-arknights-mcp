@@ -26,42 +26,55 @@ class GameTools:
         self,
         client: str = "Official",
         timeout: int = 120,
+        addr: Optional[str] = None,
     ) -> CLIResult:
         """启动明日方舟游戏并进入主界面
 
         Args:
             client: 客户端类型，如 "Official"（官服）、"Bilibili"（B 服）等
             timeout: 超时时间（秒）
+            addr: ADB 设备地址，如 "127.0.0.1:5555"；留空使用 MAA 配置/默认设备
 
         Returns:
             CLIResult: 执行结果
         """
-        logger.info(f"Starting game with client: {client}")
-        return self.cli.run(["startup", client], timeout=timeout)
+        args = ["startup", client]
+        if addr:
+            args.extend(["-a", addr])
+        logger.info(f"Starting game with client: {client}, addr: {addr}")
+        return self.cli.run(args, timeout=timeout)
 
-    def closedown(self, client: str = "Official") -> CLIResult:
+    def closedown(self, client: str = "Official", addr: Optional[str] = None) -> CLIResult:
         """关闭明日方舟游戏客户端
 
         Args:
             client: 客户端类型
+            addr: ADB 设备地址
 
         Returns:
             CLIResult: 执行结果
         """
-        logger.info(f"Closing game with client: {client}")
-        return self.cli.run(["closedown", client])
+        args = ["closedown", client]
+        if addr:
+            args.extend(["-a", addr])
+        logger.info(f"Closing game with client: {client}, addr: {addr}")
+        return self.cli.run(args)
 
-    def activity(self, client: str = "Official") -> CLIResult:
+    def activity(self, client: str = "Official", addr: Optional[str] = None) -> CLIResult:
         """获取游戏当前活动信息
 
         Args:
             client: 客户端类型
+            addr: ADB 设备地址
 
         Returns:
             CLIResult: 执行结果
         """
-        logger.info(f"Getting activity info for client: {client}")
-        return self.cli.run(["activity", client])
+        args = ["activity", client]
+        if addr:
+            args.extend(["-a", addr])
+        logger.info(f"Getting activity info for client: {client}, addr: {addr}")
+        return self.cli.run(args)
 
     def check_game_running(self, client: str = "Official") -> bool:
         """检查游戏是否正在运行

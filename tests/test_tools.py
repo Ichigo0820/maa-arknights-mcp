@@ -72,6 +72,30 @@ class TestCombatTools:
         combat = CombatTools(cli)
         result = combat.fight(stage="BB-7", count=3)
         assert result.success is True
+        mock_run.assert_called_once_with(
+            ["fight", "BB-7", "--times", "3"], timeout=None
+        )
+
+    @patch("maa_arknights_mcp.cli.MAACLI.run")
+    def test_fight_with_medicine_and_addr(self, mock_run):
+        """理智药和 ADB 地址必须使用 maa-cli 支持的参数"""
+        mock_run.return_value = MagicMock(success=True, returncode=0, stdout="", stderr="")
+        cli = MAACLI()
+        combat = CombatTools(cli)
+        combat.fight(stage="1-7", count=0, medicine=2, series=1, addr="127.0.0.1:5555")
+        mock_run.assert_called_once_with(
+            [
+                "fight",
+                "1-7",
+                "-m",
+                "2",
+                "--series",
+                "1",
+                "-a",
+                "127.0.0.1:5555",
+            ],
+            timeout=None,
+        )
 
     @patch("maa_arknights_mcp.cli.MAACLI.run")
     def test_copilot(self, mock_run):

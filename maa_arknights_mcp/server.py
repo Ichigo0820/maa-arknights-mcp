@@ -146,34 +146,38 @@ def _register_game_tools(mcp: FastMCP, game: GameTools) -> None:
     def maa_startup(
         client: str = "Official",
         timeout: int = 120,
+        addr: Optional[str] = None,
     ) -> str:
         """启动明日方舟游戏并进入主界面
 
         Args:
             client: 客户端类型，如 "Official"（官服）、"Bilibili"（B 服）等
             timeout: 超时时间（秒）
+            addr: ADB 设备地址，如 "127.0.0.1:5555"（模拟器/WSA 常用）；留空使用 MAA 默认设备
         """
-        result = game.startup(client=client, timeout=timeout)
+        result = game.startup(client=client, timeout=timeout, addr=addr)
         return _format_result(result)
 
     @mcp.tool()
-    def maa_closedown(client: str = "Official") -> str:
+    def maa_closedown(client: str = "Official", addr: Optional[str] = None) -> str:
         """关闭明日方舟游戏客户端
 
         Args:
             client: 客户端类型
+            addr: ADB 设备地址
         """
-        result = game.closedown(client=client)
+        result = game.closedown(client=client, addr=addr)
         return _format_result(result)
 
     @mcp.tool()
-    def maa_activity(client: str = "Official") -> str:
+    def maa_activity(client: str = "Official", addr: Optional[str] = None) -> str:
         """获取游戏当前活动信息
 
         Args:
             client: 客户端类型
+            addr: ADB 设备地址
         """
-        result = game.activity(client=client)
+        result = game.activity(client=client, addr=addr)
         return _format_result(result)
 
 
@@ -183,32 +187,32 @@ def _register_combat_tools(mcp: FastMCP, combat: CombatTools) -> None:
     @mcp.tool()
     def maa_fight(
         stage: str = "",
-        mode: int = 1,
         count: int = 1,
-        use_drugs: bool = False,
-        drug_limit: int = 0,
-        copilot: bool = False,
-        copilot_uri: str = "",
+        medicine: int = 0,
+        series: Optional[int] = None,
+        addr: Optional[str] = None,
+        client_type: Optional[str] = None,
+        timeout: int = 600,
     ) -> str:
         """运行战斗任务（刷关卡）
 
         Args:
             stage: 关卡名称，如 "1-7"、"BB-7"、"E8-2" 等，留空使用上次关卡
-            mode: 模式（1=普通，2=自动战斗）
-            count: 刷取次数
-            use_drugs: 是否使用理智药
-            drug_limit: 理智药使用上限（0=不限制）
-            copilot: 是否使用抄作业
-            copilot_uri: 作业 URI（maa://xxx 或本地文件路径）
+            count: 刷取次数，0 = 一直刷直到理智耗尽
+            medicine: 使用理智药（药剂）的数量
+            series: 连续作战次数（-1~6），留空使用 MAA 默认值
+            addr: ADB 设备地址，如 "127.0.0.1:5555"；留空使用 MAA 默认设备
+            client_type: 关卡崩溃后用于重启的客户端类型
+            timeout: 超时时间（秒）
         """
         result = combat.fight(
             stage=stage,
-            mode=mode,
             count=count,
-            use_drugs=use_drugs,
-            drug_limit=drug_limit,
-            copilot=copilot,
-            copilot_uri=copilot_uri,
+            medicine=medicine,
+            series=series,
+            addr=addr,
+            client_type=client_type,
+            timeout=timeout,
         )
         return _format_result(result)
 
@@ -427,6 +431,29 @@ def _register_config_tools(mcp: FastMCP, cli: MAACLI) -> None:
     def maa_list() -> str:
         """列出所有可用的预定义任务"""
         result = cli.run(["list"])
+        return _format_result(result)
+
+    @mcp.tool()
+    def maa_run(
+        task: str,
+        addr: Optional[str] = None,
+        batch: bool = False,
+        timeout: int = 600,
+    ) -> str:
+        """运行自定义任务（config/tasks 目录下的 TOML/JSON 任务文件）
+
+        Args:
+            task: 任务名，即 tasks 目录下不含扩展名的文件名
+            addr: ADB 设备地址，如 "127.0.0.1:58526"；留空使用配置文件中的地址
+            batch: 批处理模式，跳过任务中的交互式提问
+            timeout: 超时时间（秒）
+        """
+        args = ["run", task]
+        if addr:
+            args.extend(["-a", addr])
+        if batch:
+            args.append("--batch")
+        result = cli.run(args, timeout=timeout)
         return _format_result(result)
 
     @mcp.tool()

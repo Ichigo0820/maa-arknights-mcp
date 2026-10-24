@@ -189,10 +189,14 @@ def _handle_server(args) -> None:
 
     transport = getattr(args, "transport", "stdio")
     if transport in ("http", "sse", "streamable-http"):
-        mcp.run_http_async(
-            transport=transport,
-            host=getattr(args, "host", "127.0.0.1"),
-            port=getattr(args, "port", 8000),
+        import asyncio
+
+        asyncio.run(
+            mcp.run_http_async(
+                transport=transport,
+                host=getattr(args, "host", "127.0.0.1"),
+                port=getattr(args, "port", 8000),
+            )
         )
     else:
         # stdio 模式 - MCP 标准协议

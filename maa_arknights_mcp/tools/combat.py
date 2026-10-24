@@ -25,23 +25,23 @@ class CombatTools:
     def fight(
         self,
         stage: str = "",
-        mode: int = 1,
         count: int = 1,
-        use_drugs: bool = False,
-        drug_limit: int = 0,
-        copilot: bool = False,
-        copilot_uri: str = "",
+        medicine: int = 0,
+        series: Optional[int] = None,
+        addr: Optional[str] = None,
+        client_type: Optional[str] = None,
+        timeout: Optional[int] = None,
     ) -> CLIResult:
         """运行战斗任务（刷关卡）
 
         Args:
             stage: 关卡名称，如 "1-7"、"BB-7"、"E8-2" 等，留空使用上次关卡
-            mode: 模式（1=普通，2=自动战斗）
-            count: 刷取次数
-            use_drugs: 是否使用理智药
-            drug_limit: 理智药使用上限（0=不限制）
-            copilot: 是否使用抄作业
-            copilot_uri: 作业 URI（maa://xxx 或本地文件路径）
+            count: 刷取次数（0 = 一直刷，直到理智耗尽或手动停止）
+            medicine: 使用理智药的数量
+            series: 连续作战次数（-1~6），留空使用 MAA 默认值
+            addr: ADB 设备地址，如 "127.0.0.1:5555"；留空使用 MAA 配置/默认设备
+            client_type: 关卡崩溃后用于重启的客户端类型
+            timeout: 超时时间（秒），留空使用默认值
 
         Returns:
             CLIResult: 执行结果
@@ -49,19 +49,21 @@ class CombatTools:
         args = ["fight"]
         if stage:
             args.append(stage)
-        if mode != 1:
-            args.extend(["-m", str(mode)])
-        if count != 1:
-            args.extend(["-c", str(count)])
-        if use_drugs:
-            args.append("--use-drugs")
-        if drug_limit > 0:
-            args.extend(["--drug-limit", str(drug_limit)])
-        if copilot and copilot_uri:
-            args.extend(["--copilot", copilot_uri])
+        if count > 0:
+            args.extend(["--times", str(count)])
+        if medicine > 0:
+            args.extend(["-m", str(medicine)])
+        if series is not None:
+            args.extend(["--series", str(series)])
+        if client_type:
+            args.extend(["--client-type", client_type])
+        if addr:
+            args.extend(["-a", addr])
 
-        logger.info(f"Fighting: stage={stage}, count={count}, use_drugs={use_drugs}")
-        return self.cli.run(args)
+        logger.info(
+            f"Fighting: stage={stage}, times={count}, medicine={medicine}, addr={addr}"
+        )
+        return self.cli.run(args, timeout=timeout)
 
     def copilot(self, maa_uris: str) -> CLIResult:
         """自动抄作业
