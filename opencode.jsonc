@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "maa-arknights": {
+        "type": "local",
+        "command": [".venv\\Scripts\\python.exe", "-m", "maa_arknights_mcp"],
+        "cwd": ".",
+        "codemode": false,
+        "timeout": {
+          "startup": 30000,
+          "catalog": 30000,
+          "execution": 7200000
+        }
+      }
+    }
+  }
+}
