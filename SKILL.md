@@ -6,6 +6,14 @@
 
 ## 核心功能
 
+### 0. 安装与更新（自动集成 MAA CLI）
+- **检查状态**：`maa_check` - 检查 MAA CLI 是否已安装及版本信息
+- **安装 MAA**：`maa_install_cli` - 自动安装 MAA CLI 及 MaaCore（支持跨平台）
+- **更新 CLI**：`maa_update_cli` - 更新 MAA CLI
+- **更新 Core**：`maa_update_core` - 更新 MaaCore 及资源
+
+> **无需手动安装 MAA CLI！** 项目已集成安装器，首次使用时 AI 会自动检测并安装。
+
 ### 1. 游戏控制
 - **启动游戏**：`maa_startup` - 启动明日方舟并进入主界面
 - **关闭游戏**：`maa_closedown` - 关闭游戏客户端
@@ -42,6 +50,18 @@
 - **目录**：`maa_dir` - 获取 MAA 目录路径
 
 ## 使用指南
+
+### 首次使用
+
+项目已集成 MAA CLI 安装器，首次使用时 AI 会自动检测并安装：
+
+```
+用户：我想玩明日方舟
+AI：好的，检测到您尚未安装 MAA CLI，正在为您安装...
+    → 调用 maa_install_cli()
+    → 返回安装结果
+    → 继续执行游戏操作
+```
 
 ### 日常任务流程
 
@@ -89,9 +109,12 @@ AI：好的，正在启动集成战略...
 
 ## 注意事项
 
-1. **前置条件**：需要已安装 MAA CLI 和 MaaCore
-   - Windows: `winget install maa`
-   - macOS: `brew install MaaAssistantArknights/tap/maa-cli`
+1. **自动安装**：项目已集成 MAA CLI 安装器，首次使用时会自动检测并安装
+   - 如自动安装失败，可使用 `maa_install_cli(force=True)` 强制安装
+   - 或手动安装：Windows: `winget install maa`
+
+2. **VC++ 运行库**：Windows 用户需要安装 VC++ 运行库
+   - 运行：`winget install "Microsoft.VCRedist.2015+.x64"`
 
 2. **超时设置**：游戏操作可能需要较长时间，默认超时 600 秒
 

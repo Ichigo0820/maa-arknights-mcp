@@ -11,6 +11,7 @@ from typing import Optional
 from fastmcp import FastMCP
 
 from .cli import MAACLI
+from .installer import MAAInstaller
 from .tools.game import GameTools
 from .tools.combat import CombatTools
 from .tools.roguelike import RoguelikeTools
@@ -45,6 +46,7 @@ def create_mcp_server(
 
     # 创建 MAA CLI 实例
     cli = MAACLI(cmd=maa_cmd, timeout=timeout, log_dir=log_dir)
+    installer = MAAInstaller(maa_cmd=maa_cmd)
 
     # 创建工具实例
     game_tools = GameTools(cli)
@@ -52,6 +54,9 @@ def create_mcp_server(
     roguelike_tools = RoguelikeTools(cli)
     infrastructure_tools = InfrastructureTools(cli)
     recruit_tools = RecruitTools(cli)
+
+    # 注册安装器工具
+    _register_installer_tools(mcp, installer)
 
     # 注册游戏控制工具
     _register_game_tools(mcp, game_tools)
@@ -72,6 +77,66 @@ def create_mcp_server(
     _register_config_tools(mcp, cli)
 
     return mcp
+
+
+def _register_installer_tools(mcp: FastMCP, installer: MAAInstaller) -> None:
+    """注册安装器工具"""
+
+    @mcp.tool()
+    def maa_check() -> str:
+        """检查 MAA CLI 是否已安装及版本信息
+
+        Returns:
+            安装状态 JSON
+        """
+        status = installer.get_status()
+        return json.dumps(
+            {
+                "success": status.success,
+                "message": status.message,
+                "maa_cli_installed": status.maa_cli_installed,
+                "maa_core_installed": status.maa_core_installed,
+                "maa_cli_version": status.maa_cli_version,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.tool()
+    def maa_install_cli(force: bool = False) -> str:
+        """安装 MAA CLI 及 MaaCore
+
+        Args:
+            force: 强制重新安装
+
+        Returns:
+            安装结果 JSON
+        """
+        status = installer.install(force=force)
+        return json.dumps(
+            {
+                "success": status.success,
+                "message": status.message,
+                "maa_cli_installed": status.maa_cli_installed,
+                "maa_core_installed": status.maa_core_installed,
+                "maa_cli_version": status.maa_cli_version,
+                "maa_core_version": status.maa_core_version,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    @mcp.tool()
+    def maa_update_cli() -> str:
+        """更新 MAA CLI"""
+        result = installer.update()
+        return _format_result(result)
+
+    @mcp.tool()
+    def maa_update_core() -> str:
+        """更新 MaaCore 及资源"""
+        result = installer.update_core()
+        return _format_result(result)
 
 
 def _register_game_tools(mcp: FastMCP, game: GameTools) -> None:
