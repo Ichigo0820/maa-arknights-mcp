@@ -1,0 +1,21 @@
+# 日常任务示例
+# 启动游戏 → 刷 BB-7（3 次，使用理智药）→ 关闭游戏
+
+tasks:
+  - name: startup
+    command: startup
+    params:
+      client: Official
+
+  - name: fight
+    command: fight
+    params:
+      stage: BB-7
+      count: 3
+      use_drugs: true
+      drug_limit: 0
+
+  - name: closedown
+    command: closedown
+    params:
+      client: Official
