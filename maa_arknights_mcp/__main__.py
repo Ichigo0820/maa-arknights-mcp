@@ -179,18 +179,20 @@ def _handle_update(args) -> None:
 def _handle_server(args) -> None:
     """处理服务器命令"""
     # 创建并运行 MCP Server
-    log_dir = Path(args.log_dir) if args.log_dir else None
+    # 使用 getattr 提供默认值，兼容无子命令的情况（OpenCode 启动方式）
+    log_dir = Path(getattr(args, "log_dir", None)) if getattr(args, "log_dir", None) else None
     mcp = create_mcp_server(
-        maa_cmd=args.maa_cmd,
-        timeout=args.timeout,
+        maa_cmd=getattr(args, "maa_cmd", "maa"),
+        timeout=getattr(args, "timeout", 600),
         log_dir=log_dir,
     )
 
-    if args.transport in ("http", "sse", "streamable-http"):
+    transport = getattr(args, "transport", "stdio")
+    if transport in ("http", "sse", "streamable-http"):
         mcp.run_http_async(
-            transport=args.transport,
-            host=args.host,
-            port=args.port,
+            transport=transport,
+            host=getattr(args, "host", "127.0.0.1"),
+            port=getattr(args, "port", 8000),
         )
     else:
         # stdio 模式 - MCP 标准协议
