@@ -71,6 +71,34 @@ class TestMCPServer:
         assert result is not None
 
     @patch("maa_arknights_mcp.cli.MAACLI.run")
+    def test_maa_fight_tool_expiring_medicine(self, mock_run):
+        """maa_fight 工具应能透传临期理智药参数，且不含源石参数"""
+        mock_run.return_value = MagicMock(
+            success=True,
+            returncode=0,
+            stdout="",
+            stderr="",
+            command="maa fight AP-5",
+        )
+
+        mcp = create_mcp_server(maa_cmd="maa")
+        asyncio.run(
+            _call_tool(
+                mcp,
+                "maa_fight",
+                {
+                    "stage": "AP-5",
+                    "count": 0,
+                    "medicine": 1,
+                    "expiring_medicine": 2,
+                },
+            )
+        )
+        args = mock_run.call_args.args[0]
+        assert args[args.index("--expiring-medicine") + 1] == "2"
+        assert "--stone" not in args
+
+    @patch("maa_arknights_mcp.cli.MAACLI.run")
     def test_maa_roguelike_tool(self, mock_run):
         """Test maa_roguelike tool"""
         mock_run.return_value = MagicMock(
@@ -118,13 +146,22 @@ class TestMCPServer:
     @patch("maa_arknights_mcp.cli.MAACLI.run")
     def test_maa_run_tool(self, mock_run):
         """Test maa_run tool（自定义任务，用于基建/公招等 0.7.x 无子命令的任务）"""
-        mock_run.return_value = MagicMock(
-            success=True,
-            returncode=0,
-            stdout="Task completed",
-            stderr="",
-            command="maa run daily",
-        )
+        mock_run.side_effect = [
+            MagicMock(
+                success=True,
+                returncode=0,
+                stdout="C:\\Users\\zzw\\AppData\\Roaming\\loong\\maa\\config",
+                stderr="",
+                command="maa dir config",
+            ),
+            MagicMock(
+                success=True,
+                returncode=0,
+                stdout="Task completed",
+                stderr="",
+                command="maa run daily",
+            ),
+        ]
 
         mcp = create_mcp_server(maa_cmd="maa")
         result = asyncio.run(
@@ -135,9 +172,9 @@ class TestMCPServer:
             )
         )
         assert result is not None
-        mock_run.assert_called_once_with(
-            ["run", "daily", "-a", "127.0.0.1:58526"], timeout=600
-        )
+        # 第一次调用 resolve_task_path 查目录，第二次执行任务
+        assert mock_run.call_count == 2
+        assert mock_run.call_args_list[-1].args[0] == ["run", "daily", "-a", "127.0.0.1:58526"]
 
     @patch("maa_arknights_mcp.cli.MAACLI.run")
     def test_maa_version_tool(self, mock_run):

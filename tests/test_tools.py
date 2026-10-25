@@ -98,6 +98,27 @@ class TestCombatTools:
         )
 
     @patch("maa_arknights_mcp.cli.MAACLI.run")
+    def test_fight_with_expiring_medicine(self, mock_run):
+        """临期理智药必须映射到 maa-cli 支持的参数"""
+        mock_run.return_value = MagicMock(success=True, returncode=0, stdout="", stderr="")
+        cli = MAACLI()
+        combat = CombatTools(cli)
+        combat.fight(
+            stage="AP-5", count=0, medicine=99, expiring_medicine=99
+        )
+        mock_run.assert_called_once_with(
+            [
+                "fight",
+                "AP-5",
+                "-m",
+                "99",
+                "--expiring-medicine",
+                "99",
+            ],
+            timeout=None,
+        )
+
+    @patch("maa_arknights_mcp.cli.MAACLI.run")
     def test_copilot(self, mock_run):
         mock_run.return_value = MagicMock(
             success=True,

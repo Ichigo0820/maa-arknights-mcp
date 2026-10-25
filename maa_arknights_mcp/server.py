@@ -10,7 +10,7 @@ from typing import Optional
 
 from fastmcp import FastMCP
 
-from .cli import MAACLI
+from .cli import MAACLI, CLIResult, check_task_file_for_stone
 from .installer import MAAInstaller
 from .tools.game import GameTools
 from .tools.combat import CombatTools
@@ -189,6 +189,7 @@ def _register_combat_tools(mcp: FastMCP, combat: CombatTools) -> None:
         stage: str = "",
         count: int = 1,
         medicine: int = 0,
+        expiring_medicine: int = 0,
         series: Optional[int] = None,
         addr: Optional[str] = None,
         client_type: Optional[str] = None,
@@ -196,10 +197,13 @@ def _register_combat_tools(mcp: FastMCP, combat: CombatTools) -> None:
     ) -> str:
         """运行战斗任务（刷关卡）
 
+        注意：本工具不提供「使用源石补充理智」的参数，永远不会消耗至纯源石。
+
         Args:
             stage: 关卡名称，如 "1-7"、"BB-7"、"E8-2" 等，留空使用上次关卡
             count: 刷取次数，0 = 一直刷直到理智耗尽
-            medicine: 使用理智药（药剂）的数量
+            medicine: 使用（普通）理智药（药剂）的数量
+            expiring_medicine: 使用临期理智药的数量
             series: 连续作战次数（-1~6），留空使用 MAA 默认值
             addr: ADB 设备地址，如 "127.0.0.1:5555"；留空使用 MAA 默认设备
             client_type: 关卡崩溃后用于重启的客户端类型
@@ -209,6 +213,7 @@ def _register_combat_tools(mcp: FastMCP, combat: CombatTools) -> None:
             stage=stage,
             count=count,
             medicine=medicine,
+            expiring_medicine=expiring_medicine,
             series=series,
             addr=addr,
             client_type=client_type,
@@ -442,12 +447,29 @@ def _register_config_tools(mcp: FastMCP, cli: MAACLI) -> None:
     ) -> str:
         """运行自定义任务（config/tasks 目录下的 TOML/JSON 任务文件）
 
+        注意：任务文件中若包含 stone > 0（消耗源石），将被拒绝执行。
+
         Args:
             task: 任务名，即 tasks 目录下不含扩展名的文件名
             addr: ADB 设备地址，如 "127.0.0.1:58526"；留空使用配置文件中的地址
             batch: 批处理模式，跳过任务中的交互式提问
             timeout: 超时时间（秒）
         """
+        task_path = cli.resolve_task_path(task)
+        if task_path is not None:
+            blocked = check_task_file_for_stone(task_path)
+            if blocked:
+                logger.warning(blocked)
+                return _format_result(
+                    CLIResult(
+                        success=False,
+                        returncode=-1,
+                        stdout="",
+                        stderr=blocked,
+                        command=f"maa run {task}",
+                    )
+                )
+
         args = ["run", task]
         if addr:
             args.extend(["-a", addr])

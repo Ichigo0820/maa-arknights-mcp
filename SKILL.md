@@ -112,8 +112,9 @@ AI：好的，正在启动集成战略...
 #### maa_fight（刷关卡）
 
 - `stage`: 关卡名称，如 "1-7"、"BB-7"、"E8-2"，留空使用上次关卡
-- `count`: 刷取次数，0 = 一直刷直到理智耗尽（默认 1）
-- `medicine`: 使用理智药（药剂）的数量（默认 0）
+- `count`: 刷取次数，0 = 一直刷直到理智耗尽（默认 1，判断逻辑见「理智不足时任务如何结束」）
+- `medicine`: 使用（普通）理智药（药剂）的数量（默认 0；用完后不会自动改用源石）
+- `expiring_medicine`: 使用临期理智药的数量（默认 0）
 - `series`: 连续作战次数（-1~6），留空使用 MAA 默认值
 - `addr`: ADB 设备地址，如 "127.0.0.1:58526"；留空使用 MAA 配置文件中的地址
 - `client_type`: 关卡崩溃后用于重启的客户端类型
@@ -217,6 +218,56 @@ type = "Recruit"
 ```
 → 调用 maa_closedown(client="Official", addr="127.0.0.1:58526")
 ```
+
+## 理智不足时任务如何结束
+
+`count=0`（`--times` 缺省）表示"不限次数"，但真正决定何时收手的是**每场战斗前对理智的比对**，与"药是否用完"是两件事。
+
+### 判断流程
+
+1. **读当前理智**：进入关卡界面后 OCR 右上角理智值，日志中为
+   `FightTimesTaskPlugin::analyze_sanity_remain Current Sanity: 6 , Max Sanity: 210`
+2. **读关卡消耗**：通过 `StageSanityCost.png` 模板 + OCR 得到 `sanity_cost`（AP-5 为 30）
+3. **比对**：`当前理智 >= 消耗 × series` 则直接点「开始行动」；不足则游戏弹出补充理智弹窗
+4. **弹窗按优先级处理**：理智药弹窗（普通 / 临期，受 `medicine`、`expiring_medicine` 与库存限制）→ 源石（`UseStone`）→ 都没配置或已用完则点关闭（`CloseStonePage`）
+5. **连续关闭 2 次仍开不了局** → `CloseStonePageExceeded` → `TaskChainCompleted`，Fight 任务结束
+
+也就是说：**补理智的方式完全由参数控制**——`medicine` / `expiring_medicine` 分别对应普通药、临期药，打光了不会自动跨类型降级；两者都为 0 时 MAA 只关弹窗、不消耗任何道具。
+
+> ⚠️ **源石（至纯源石）接口已屏蔽**：本 MCP 不提供消耗源石补充理智的能力，`maa_fight` 工具无 `stone` 参数，CLI 层也会自动剥离 `--stone` 参数，自定义任务文件中若含 `stone > 0` 也会被拒绝。
+
+### 日志对照示例
+
+一次"空跑"（6 秒一个循环，连点 3 次开始行动，一次都没打）：
+
+```
+FightTimesTaskPlugin::analyze_sanity_remain Current Sanity: 6 , Max Sanity: 210
+FightTimes { "sanity_cost": 30, "series": 1, "times_finished": 0 }
+... task: "StartButton1"  exec_times: 3
+... match UseStone.png score 0.996        <- 弹窗只剩源石页，说明背包里没有理智药
+... task: "CloseStonePageExceeded"
+TaskChainCompleted { "taskchain": "Fight" }
+```
+
+> 弹窗直接出现「使用源石」页（`UseStone.png`）而不是理智药确认页，是"药已用完"的确凿信号。
+
+日志位置：`maa dir log`（默认 `%APPDATA%\loong\maa\data\debug\asst.log`），排查关键字：`Sanity`、`sanity_cost`、`CloseStonePageExceeded`。
+
+### 结果判读
+
+| 现象 | 含义 |
+|---|---|
+| 正常结束 + 掉落汇总 | 打满次数 / 掉落达标 / 理智不足，三者之一 |
+| 几十秒完成、无战斗、无掉落 | 理智不足且无药可用，一次都没打 |
+| 日志出现 `CloseStonePageExceeded` | 理智药不可用（源石接口已屏蔽） |
+| 只打了 N 次就停 | 初始理智 + 已用药水 < (N+1) × 消耗 |
+
+### 注意事项
+
+- **临期理智药**：用 `expiring_medicine` 参数（对应 CLI 的 `--expiring-medicine`），与 `medicine` 独立计数。两类都用光可写 `medicine=99, expiring_medicine=99`
+- **源石（至纯源石）已屏蔽**：本 MCP 不提供消耗源石补充理智的能力，`maa_fight` 工具无 `stone` 参数，CLI 层也会自动剥离 `--stone` 参数，自定义任务文件中若含 `stone > 0` 也会被拒绝
+- **连续作战**：`series` 模式下按 `series × 消耗` 判断，可能出现"还有 30 理智，但开 4 连战就停了"的情况，属正常
+- **理智恰好不足**：剩余理智低于单次消耗时不会"凑一发"，直接结束
 
 ## 注意事项
 

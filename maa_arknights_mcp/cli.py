@@ -4,6 +4,7 @@
 """
 
 import json
+import re
 import subprocess
 import logging
 from dataclasses import dataclass, field
@@ -11,6 +12,75 @@ from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# 源石（至纯源石）是付费资源，本 MCP 一律禁止消耗。
+# 该策略在 CLI 封装层兜底：任何工具（含未来新增的）传入 --stone 都会被剥离。
+FORBIDDEN_CLI_ARGS = ("--stone",)
+
+# 自定义任务文件里若写了 stone = N（N > 0）也视为违规
+_STONE_IN_TASK = re.compile(r'\bstone\b\s*[=:]\s*["\']?(\d+)', re.IGNORECASE)
+
+
+def strip_forbidden_args(args: list[str]) -> list[str]:
+    """移除被策略禁止的 CLI 参数（如 --stone 及其取值）
+
+    Args:
+        args: 原始参数列表
+
+    Returns:
+        list[str]: 过滤后的参数列表
+    """
+    cleaned: list[str] = []
+    dropped: list[str] = []
+    skip_next = False
+
+    for arg in args:
+        if skip_next:
+            skip_next = False
+            dropped.append(arg)
+            continue
+        if arg in FORBIDDEN_CLI_ARGS:
+            dropped.append(arg)
+            skip_next = True
+            continue
+        if any(arg.startswith(f"{flag}=") for flag in FORBIDDEN_CLI_ARGS):
+            dropped.append(arg)
+            continue
+        cleaned.append(arg)
+
+    if dropped:
+        logger.warning(
+            "已屏蔽源石相关参数（本 MCP 禁止消耗源石）: %s", " ".join(dropped)
+        )
+    return cleaned
+
+
+def check_task_file_for_stone(path: Path) -> Optional[str]:
+    """检查自定义任务文件是否要求消耗源石
+
+    Args:
+        path: 任务文件路径
+
+    Returns:
+        Optional[str]: 违规说明；None 表示未使用源石（或文件不存在/无法读取）
+    """
+    if not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+    for match in _STONE_IN_TASK.finditer(text):
+        try:
+            if int(match.group(1)) > 0:
+                return (
+                    f"任务文件 {path.name} 中设置了 stone = {match.group(1)}，"
+                    "本 MCP 禁止消耗源石，已拒绝执行"
+                )
+        except ValueError:
+            continue
+    return None
 
 
 @dataclass
@@ -71,6 +141,7 @@ class MAACLI:
             CLIResult: 执行结果
         """
         timeout = timeout or self.timeout
+        args = strip_forbidden_args(list(args))
         full_cmd = [self.cmd] + args
 
         logger.info(f"Executing: {' '.join(full_cmd)}")
@@ -144,6 +215,32 @@ class MAACLI:
                 stderr=str(e),
                 command=" ".join(full_cmd),
             )
+
+    def resolve_task_path(self, task: str) -> Optional[Path]:
+        """解析自定义任务文件路径
+
+        支持直接传文件路径，或传 config/tasks 目录下的任务名（不含扩展名）。
+
+        Args:
+            task: 任务名或文件路径
+
+        Returns:
+            Optional[Path]: 找到的任务文件；找不到返回 None
+        """
+        candidate = Path(task)
+        if candidate.is_file():
+            return candidate
+        if candidate.suffix:
+            return None
+
+        result = self.run(["dir", "config"])
+        config_dir = result.stdout.strip() if result.success else ""
+        if config_dir and Path(config_dir).is_dir():
+            for ext in (".toml", ".json"):
+                file_path = Path(config_dir) / "tasks" / f"{task}{ext}"
+                if file_path.is_file():
+                    return file_path
+        return None
 
     def _prepare_env(self, log_file: Optional[Path] = None) -> dict:
         """准备环境变量"""
