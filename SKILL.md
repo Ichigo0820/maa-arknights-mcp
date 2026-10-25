@@ -4,6 +4,12 @@
 
 这是一个用于自动化明日方舟游戏的 MCP Server，通过 MAA CLI 实现游戏操作的自动化。AI 助手可以通过自然语言理解玩家意图，并调用相应的工具执行游戏操作。
 
+## 使用规范
+
+> ⚠️ **禁止绕过 MCP 直接调用 maa CLI**：所有游戏操作必须通过本 MCP 工具（`maa_fight`、`maa_roguelike`、`maa_run` 等）执行。
+> 直接调用 `maa` 命令会绕过 MCP 层的安全检查（如源石屏蔽、参数校验），可能导致意外消耗或配置错误。
+> 如需新增功能，应扩展 MCP 工具而非自行调用 CLI。
+
 ## 核心功能
 
 > **在 OpenCode 中调用**：本 Server 以 `maa_arknights` 为名注册，Code Mode 中的路径为

@@ -41,6 +41,8 @@ def create_mcp_server(
         instructions=(
             "MAA Arknights MCP Server - 明日方舟自动化助手。"
             "通过 MAA CLI 自动化游戏操作，包括刷关卡、肉鸽、基建、公招等。"
+            "\n\n⚠️ 重要：所有游戏操作必须通过本 MCP 工具调用，禁止绕过 MCP 直接执行 maa CLI 命令。"
+            "直接调用 CLI 会绕过安全检查（如源石屏蔽、参数校验），可能导致意外消耗或配置错误。"
         ),
     )
 
